@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 
+import { LoginForm } from "@/app/(auth)/_components/login-form";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default async function RootPage() {
+export default async function LoginPage() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
 
@@ -10,5 +11,5 @@ export default async function RootPage() {
     redirect("/dashboard");
   }
 
-  redirect("/login");
+  return <LoginForm />;
 }
