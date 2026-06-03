@@ -14,7 +14,7 @@ export default async function CategoriesPage() {
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Kategori</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Kategori dipakai untuk memberi konteks transaksi (Produksi, Jual, Retur, Koreksi, dll).
+          Kategori dipakai untuk memberi konteks transaksi (Produksi, Jual, Retur, dll).
         </p>
       </header>
 

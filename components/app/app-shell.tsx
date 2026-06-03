@@ -11,12 +11,10 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-dvh bg-background">
-      <div className="mx-auto grid min-h-dvh w-full max-w-7xl grid-cols-[240px_1fr]">
-        <AppSidebar userEmail={userEmail} />
-        <main className="min-w-0 border-l border-border/60">
-          <div className="px-6 py-6">{children}</div>
-        </main>
-      </div>
+      <AppSidebar userEmail={userEmail} />
+      <main className="min-h-dvh min-w-0 pl-60">
+        <div className="px-6 py-6">{children}</div>
+      </main>
     </div>
   );
 }

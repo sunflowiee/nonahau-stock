@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { WIB_TZ } from "@/lib/date";
-import { cn } from "@/lib/utils";
 
 type Row = {
   movement_id: number;
@@ -36,14 +35,22 @@ function isWithin2Days(createdAtIso: string) {
   return now <= createdAt + twoDaysMs;
 }
 
-export function MovementsTable({ rows }: { rows: Row[] }) {
+export function MovementsTable({
+  rows,
+  emptyMessage = "Tidak ada data.",
+  showProductColumn = true,
+}: {
+  rows: Row[];
+  emptyMessage?: string;
+  showProductColumn?: boolean;
+}) {
   return (
     <div className="rounded-lg border border-border/60">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Waktu</TableHead>
-            <TableHead>Produk</TableHead>
+            {showProductColumn ? <TableHead>Produk</TableHead> : null}
             <TableHead>Tipe</TableHead>
             <TableHead className="text-right">Qty (pcs)</TableHead>
             <TableHead>Kategori</TableHead>
@@ -54,8 +61,8 @@ export function MovementsTable({ rows }: { rows: Row[] }) {
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                Tidak ada data pada filter ini.
+              <TableCell colSpan={showProductColumn ? 7 : 6} className="py-10 text-center text-sm text-muted-foreground">
+                {emptyMessage}
               </TableCell>
             </TableRow>
           ) : (
@@ -67,38 +74,24 @@ export function MovementsTable({ rows }: { rows: Row[] }) {
                   <TableCell className="whitespace-nowrap text-sm">
                     {formatInTimeZone(new Date(r.movement_at), WIB_TZ, "dd MMM yyyy, HH:mm")}
                   </TableCell>
-                  <TableCell className="font-medium">{r.product_name}</TableCell>
+                  {showProductColumn ? <TableCell className="font-medium">{r.product_name}</TableCell> : null}
                   <TableCell>
                     <Badge variant={typeBadgeVariant(r.type)}>{r.type}</Badge>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{qty}</TableCell>
                   <TableCell className="text-sm">{r.category_name}</TableCell>
-                  <TableCell className="max-w-[420px] truncate text-sm text-muted-foreground">
+                  <TableCell className="max-w-105 truncate text-sm text-muted-foreground">
                     {r.description ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-2">
-                      <Link
-                        href={`/movements/${r.movement_id}/edit`}
-                        className={cn(
-                          buttonVariants({ variant: "outline", size: "sm" }),
-                          !canEdit && "pointer-events-none opacity-50"
-                        )}
-                        aria-disabled={!canEdit}
-                        tabIndex={!canEdit ? -1 : 0}
-                      >
-                        Edit
-                      </Link>
-
-                      {r.type === "IN" || r.type === "OUT" ? (
-                        <Link
-                          href={`/movements/new?type=ADJUST&kind=CORRECTION&origin=${r.movement_id}&product=${r.product_id}`}
-                          className={buttonVariants({ variant: "ghost", size: "sm" })}
-                        >
-                          Koreksi
-                        </Link>
-                      ) : null}
-                    </div>
+                    <Link
+                      href={`/movements/${r.movement_id}/edit`}
+                      className={buttonVariants({ variant: "outline", size: "sm" }) + (!canEdit ? " pointer-events-none opacity-50" : "")}
+                      aria-disabled={!canEdit}
+                      tabIndex={!canEdit ? -1 : 0}
+                    >
+                      Edit
+                    </Link>
                   </TableCell>
                 </TableRow>
               );

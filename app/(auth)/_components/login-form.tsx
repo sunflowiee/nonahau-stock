@@ -45,7 +45,7 @@ export function LoginForm() {
       <CardHeader className="space-y-1">
         <CardTitle className="text-xl tracking-tight">Nonahau Stock</CardTitle>
         <CardDescription className="text-sm">
-          Login untuk mencatat stok masuk, stok keluar, koreksi, dan opname.
+          Login untuk mencatat stok masuk dan stok keluar.
         </CardDescription>
       </CardHeader>
       <CardContent>

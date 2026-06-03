@@ -6,12 +6,9 @@ Sistem web minimalis untuk pencatatan stok dimsum (barang jadi) di Dimsum Nonaha
 - Login (Supabase Auth)
 - Master produk (tambah/rename/nonaktif)
 - Master kategori (tambah/rename/nonaktif) + inline create dari form transaksi
-- Transaksi stok:
+- Transaksi stok jadi:
   - `IN` (stok masuk)
   - `OUT` (stok keluar) — divalidasi agar tidak melebihi stok saat ini
-  - `ADJUST`:
-    - `CORRECTION` (koreksi) — dibatasi max 2 hari sejak transaksi asal dicatat
-    - `OPNAME` (opname) — single & bulk
 - Dashboard:
   - Grafik IN vs OUT (harian/bulanan/tahunan), default 7 hari terakhir
   - Filter per produk

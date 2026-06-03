@@ -131,7 +131,6 @@ export function MovementsFilters({
             <SelectItem value="all">Semua</SelectItem>
             <SelectItem value="IN">IN</SelectItem>
             <SelectItem value="OUT">OUT</SelectItem>
-            <SelectItem value="ADJUST">ADJUST</SelectItem>
           </SelectContent>
         </Select>
       </div>

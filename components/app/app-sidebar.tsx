@@ -17,7 +17,7 @@ const navItems = [
   },
   {
     href: "/movements",
-    label: "Transaksi",
+    label: "Inventory",
     icon: ClipboardList,
   },
   {
@@ -36,7 +36,7 @@ export function AppSidebar({ userEmail }: { userEmail: string }) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex min-h-dvh flex-col px-4 py-5">
+    <aside className="fixed inset-y-0 left-0 z-20 flex w-60 flex-col overflow-y-auto border-r border-border/60 bg-background px-4 py-5">
       <div className="px-2">
         <div className="text-sm font-medium tracking-tight">Nonahau Stock</div>
         <div className="mt-0.5 text-xs text-muted-foreground">

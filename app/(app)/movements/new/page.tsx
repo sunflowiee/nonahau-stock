@@ -3,9 +3,7 @@ import { LinkButton } from "@/components/app/link-button";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type SearchParams = {
-  type?: "IN" | "OUT" | "ADJUST";
-  kind?: "CORRECTION" | "OPNAME";
-  origin?: string;
+  type?: "IN" | "OUT";
   product?: string;
 };
 
@@ -16,10 +14,7 @@ export default async function NewMovementPage({
 }) {
   const sp = await searchParams;
 
-  const type = sp.type ?? "IN";
-  const kind = sp.kind ?? "CORRECTION";
-
-  const originId = sp.origin ? Number(sp.origin) : null;
+  const type = sp.type === "OUT" ? "OUT" : "IN";
   const prefilledProductId = sp.product ? Number(sp.product) : null;
 
   const supabase = await createSupabaseServerClient();
@@ -44,7 +39,7 @@ export default async function NewMovementPage({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Tambah Transaksi</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            IN/OUT tidak bisa dikoreksi dengan edit qty. Gunakan Koreksi (ADJUST) bila salah.
+            Catat stok masuk dan stok keluar. Qty, tipe, dan produk tidak bisa diubah lewat halaman edit.
           </p>
         </div>
         <LinkButton href="/movements" variant="outline" className="h-9">
@@ -58,8 +53,6 @@ export default async function NewMovementPage({
         stocks={stocks ?? []}
         initial={{
           type,
-          kind,
-          originId,
           productId: prefilledProductId,
         }}
       />

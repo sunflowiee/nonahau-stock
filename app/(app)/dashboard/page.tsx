@@ -55,7 +55,7 @@ export default async function DashboardPage({
   const seriesRows = (series ?? []) as unknown as SeriesRow[];
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
@@ -70,7 +70,7 @@ export default async function DashboardPage({
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium">IN vs OUT</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="min-w-0">
           <InOutChart granularity={granularity} data={seriesRows} />
         </CardContent>
       </Card>
