@@ -6,7 +6,7 @@ export default async function ProductsPage() {
 
   const { data: products } = await supabase
     .from("products")
-    .select("id,name,is_active,created_at")
+    .select("id,name,min_stock_qty_pcs,is_active,created_at")
     .order("name", { ascending: true });
 
   return (

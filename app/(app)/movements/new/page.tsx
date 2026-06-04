@@ -30,7 +30,7 @@ export default async function NewMovementPage({
       .select("id,name")
       .eq("is_active", true)
       .order("name", { ascending: true }),
-    supabase.rpc("get_current_stocks"),
+    supabase.from("product_stocks").select("product_id,qty_pcs"),
   ]);
 
   return (

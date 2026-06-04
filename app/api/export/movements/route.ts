@@ -4,6 +4,17 @@ import { formatInTimeZone } from "date-fns-tz";
 import { WIB_TZ } from "@/lib/date";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+const CSV_HEADERS = [
+  "movement_at_wib",
+  "product",
+  "type",
+  "qty_pcs",
+  "category",
+  "description",
+  "created_at",
+  "updated_at",
+] as const;
+
 function csvEscape(value: unknown): string {
   const s = String(value ?? "");
   // Escape double quotes by doubling them.
@@ -11,14 +22,38 @@ function csvEscape(value: unknown): string {
   return `"${escaped}"`;
 }
 
-function toCsv(rows: Array<Record<string, unknown>>): string {
-  if (rows.length === 0) return "";
-  const headers = Object.keys(rows[0]);
+function toCsv(
+  rows: Array<Record<string, unknown>>,
+  headers: readonly string[] = CSV_HEADERS
+): string {
   const lines = [headers.map(csvEscape).join(",")];
   for (const row of rows) {
     lines.push(headers.map((h) => csvEscape(row[h])).join(","));
   }
   return lines.join("\n");
+}
+
+function isValidDateParam(value: string | null) {
+  if (!value) return true;
+  return !Number.isNaN(new Date(value).getTime());
+}
+
+function buildFilename(from: string | null, to: string | null) {
+  if (!from && !to) {
+    return "nonahau-movements-all-time.csv";
+  }
+
+  const parts: string[] = [];
+
+  if (from) {
+    parts.push(`from-${formatInTimeZone(new Date(from), WIB_TZ, "yyyy-MM-dd")}`);
+  }
+
+  if (to) {
+    parts.push(`to-${formatInTimeZone(new Date(to), WIB_TZ, "yyyy-MM-dd")}`);
+  }
+
+  return `nonahau-movements-${parts.join("_")}.csv`;
 }
 
 export async function GET(req: Request) {
@@ -30,6 +65,18 @@ export async function GET(req: Request) {
   const type = url.searchParams.get("type");
   const category = url.searchParams.get("category");
   const only = url.searchParams.get("only");
+
+  if (!isValidDateParam(from)) {
+    return NextResponse.json({ error: "Parameter from tidak valid." }, { status: 400 });
+  }
+
+  if (!isValidDateParam(to)) {
+    return NextResponse.json({ error: "Parameter to tidak valid." }, { status: 400 });
+  }
+
+  if (from && to && new Date(from).getTime() > new Date(to).getTime()) {
+    return NextResponse.json({ error: "Rentang waktu export tidak valid." }, { status: 400 });
+  }
 
   const supabase = await createSupabaseServerClient();
 
@@ -82,9 +129,9 @@ export async function GET(req: Request) {
     };
   });
 
-  const csv = toCsv(rows);
+  const csv = `\uFEFF${toCsv(rows, CSV_HEADERS)}`;
 
-  const filename = `nonahau-movements-${Date.now()}.csv`;
+  const filename = buildFilename(from, to);
 
   return new NextResponse(csv, {
     status: 200,

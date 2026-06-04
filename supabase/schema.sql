@@ -46,10 +46,19 @@ $$;
 create table if not exists public.products (
   id bigserial primary key,
   name text not null unique,
+  min_stock_qty_pcs bigint not null default 0,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.products
+  add column if not exists min_stock_qty_pcs bigint not null default 0;
+
+alter table public.products drop constraint if exists products_min_stock_qty_pcs_check;
+alter table public.products
+  add constraint products_min_stock_qty_pcs_check
+  check (min_stock_qty_pcs >= 0);
 
 drop trigger if exists trg_products_trim_name on public.products;
 create trigger trg_products_trim_name
@@ -704,8 +713,8 @@ begin
   )
   select
     timezone('Asia/Jakarta', b.bucket_local) as bucket_start,
-    coalesce(a.in_qty, 0) as in_qty,
-    coalesce(a.out_qty, 0) as out_qty
+    coalesce(a.in_qty, 0)::bigint as in_qty,
+    coalesce(a.out_qty, 0)::bigint as out_qty
   from buckets b
   left join agg a
     on a.bucket_local = b.bucket_local

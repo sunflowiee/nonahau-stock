@@ -3,10 +3,11 @@
 import { useMemo } from "react";
 
 import { InventoryBatchInput } from "@/app/(app)/movements/_components/inventory-batch-input";
-import { buttonVariants } from "@/components/ui/button";
+import { InventoryGranularityFilter } from "@/app/(app)/movements/_components/inventory-granularity-filter";
+import { MovementExportDialog } from "@/app/(app)/movements/_components/movement-export-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import type { Granularity } from "@/lib/date";
 
 type Product = {
   id: number;
@@ -44,12 +45,16 @@ export function InventoryTabs({
   rows,
   stocks,
   exportHref,
+  granularity,
+  periodLabel,
 }: {
   products: Product[];
   categories: Category[];
   rows: MovementRow[];
   stocks: StockRow[];
   exportHref: string;
+  granularity: Granularity;
+  periodLabel: string;
 }) {
   const rowsByProduct = useMemo(() => {
     const map = new Map<number, MovementRow[]>();
@@ -79,12 +84,14 @@ export function InventoryTabs({
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/40 pb-4">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Inventory</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Menampilkan tracking transaksi untuk {periodLabel}.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <a href={exportHref} className={cn(buttonVariants({ className: "h-9" }))}>
-              Export CSV
-            </a>
+            <InventoryGranularityFilter />
+            <MovementExportDialog exportHref={exportHref} />
           </div>
         </header>
 
@@ -135,7 +142,9 @@ export function InventoryTabs({
 
               <Card className="gap-2 py-0 shadow-none">
                 <CardContent className="px-4 py-4">
-                  <div className="text-xs text-muted-foreground">Tracking tercatat</div>
+                  <div className="text-xs text-muted-foreground">
+                    Tracking {granularity === "day" ? "hari ini" : granularity === "month" ? "bulan ini" : "tahun ini"}
+                  </div>
                   <div className="mt-1 text-base font-semibold tabular-nums tracking-tight">{productRows.length} transaksi</div>
                   <div className="mt-1 text-xs text-muted-foreground">IN {totalIn} • OUT {totalOut}</div>
                 </CardContent>
@@ -146,6 +155,7 @@ export function InventoryTabs({
               product={product}
               categories={categories}
               existingRows={productRows}
+              periodLabel={periodLabel}
             />
           </TabsContent>
         );

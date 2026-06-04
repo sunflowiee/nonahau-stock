@@ -128,10 +128,12 @@ export function InventoryBatchInput({
   product,
   categories,
   existingRows,
+  periodLabel,
 }: {
   product: Product;
   categories: Category[];
   existingRows: ExistingRow[];
+  periodLabel: string;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -288,9 +290,9 @@ export function InventoryBatchInput({
       <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
         <div>
           <CardTitle className="text-sm font-medium">Tracking stok</CardTitle>
-          {/*<p className="mt-1 text-xs text-muted-foreground">
-            Riwayat stok produk {product.name} dan input row baru ditampilkan dalam satu tabel.
-          </p>*/}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Menampilkan riwayat transaksi {periodLabel} untuk produk {product.name}.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -426,7 +428,7 @@ export function InventoryBatchInput({
               {existingRows.length === 0 && draftRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                    Belum ada tracking untuk produk ini.
+                    Belum ada tracking untuk produk ini pada {periodLabel}.
                   </TableCell>
                 </TableRow>
               ) : null}

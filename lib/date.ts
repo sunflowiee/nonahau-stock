@@ -31,3 +31,27 @@ export function defaultRangeForGranularity(granularity: Granularity) {
     to: now,
   };
 }
+
+export function currentPeriodRangeForGranularity(granularity: Granularity) {
+  const now = new Date();
+  const nowWib = toZonedTime(now, WIB_TZ);
+
+  if (granularity === "day") {
+    return {
+      from: fromZonedTime(startOfDay(nowWib), WIB_TZ),
+      to: now,
+    };
+  }
+
+  if (granularity === "month") {
+    return {
+      from: fromZonedTime(startOfMonth(nowWib), WIB_TZ),
+      to: now,
+    };
+  }
+
+  return {
+    from: fromZonedTime(startOfYear(nowWib), WIB_TZ),
+    to: now,
+  };
+}
