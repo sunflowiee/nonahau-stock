@@ -32,15 +32,50 @@ const navItems = [
   },
 ];
 
-export function AppSidebar({ userEmail }: { userEmail: string }) {
+function formatDisplayName(userName: string | null | undefined, userEmail: string) {
+  if (userName?.trim()) return userName.trim();
+
+  const localPart = userEmail.split("@")[0] ?? "User";
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+export function AppSidebar({
+  userEmail,
+  userName,
+}: {
+  userEmail: string;
+  userName?: string | null;
+}) {
   const pathname = usePathname();
+  const displayName = formatDisplayName(userName, userEmail);
+  const initials = getInitials(displayName);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-20 flex w-60 flex-col overflow-y-auto border-r border-border/60 bg-background px-4 py-5">
-      <div className="px-2">
-        <div className="text-sm font-medium tracking-tight">Nonahau Stock</div>
-        <div className="mt-0.5 text-xs text-muted-foreground">
-          Pencatatan stok dimsum
+      <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold tracking-tight text-foreground ring-1 ring-border/60">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold tracking-tight text-foreground">
+              {displayName}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">{userEmail}</div>
+          </div>
         </div>
       </div>
 
@@ -55,7 +90,7 @@ export function AppSidebar({ userEmail }: { userEmail: string }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors",
+                "flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors",
                 active
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -70,14 +105,11 @@ export function AppSidebar({ userEmail }: { userEmail: string }) {
 
       <div className="mt-auto">
         <Separator className="my-4" />
-        <div className="px-2">
-          <div className="truncate text-xs text-muted-foreground">{userEmail}</div>
-          <form action={signOutAction} className="mt-2">
-            <Button type="submit" variant="outline" className="w-full justify-center">
-              Keluar
-            </Button>
-          </form>
-        </div>
+        <form action={signOutAction}>
+          <Button type="submit" variant="outline" className="w-full justify-center">
+            Keluar
+          </Button>
+        </form>
       </div>
     </aside>
   );

@@ -4,12 +4,28 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 
+import { MovementEditForm } from "@/app/(app)/movements/[id]/edit/_components/movement-edit-form";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { WIB_TZ } from "@/lib/date";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -122,6 +138,9 @@ export function InventoryBatchInput({
   const defaultCategoryId = categories[0] ? String(categories[0].id) : "";
 
   const [draftRows, setDraftRows] = useState<DraftRow[]>([]);
+  const [editingRow, setEditingRow] = useState<ExistingRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ExistingRow | null>(null);
+  const [deletingMovementId, setDeletingMovementId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -233,14 +252,45 @@ export function InventoryBatchInput({
     }
   }
 
+  async function confirmDeleteMovement() {
+    if (!deleteTarget) return;
+
+    setDeletingMovementId(deleteTarget.movement_id);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const { error: rpcError } = await supabase.rpc("delete_stock_movement", {
+        p_id: deleteTarget.movement_id,
+      });
+
+      if (rpcError) {
+        setError(rpcError.message);
+        return;
+      }
+
+      if (editingRow?.movement_id === deleteTarget.movement_id) {
+        setEditingRow(null);
+      }
+
+      setDeleteTarget(null);
+      setSuccess("Transaksi berhasil dihapus.");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Terjadi kesalahan saat menghapus transaksi.");
+    } finally {
+      setDeletingMovementId(null);
+    }
+  }
+
   return (
     <Card className="shadow-none">
       <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
         <div>
           <CardTitle className="text-sm font-medium">Tracking stok</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
+          {/*<p className="mt-1 text-xs text-muted-foreground">
             Riwayat stok produk {product.name} dan input row baru ditampilkan dalam satu tabel.
-          </p>
+          </p>*/}
         </div>
 
         <div className="flex items-center gap-2">
@@ -255,19 +305,19 @@ export function InventoryBatchInput({
 
       <CardContent className="space-y-3">
         {error ? (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
         ) : null}
 
         {success ? (
-          <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+          <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm">
             {success}
           </div>
         ) : null}
 
         {!canCreateRows ? (
-          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
             Belum ada kategori aktif. Tambahkan kategori dulu di halaman {" "}
             <Link href="/categories" className="font-medium text-foreground underline underline-offset-4">
               Kategori
@@ -276,7 +326,7 @@ export function InventoryBatchInput({
           </div>
         ) : null}
 
-        <div className="rounded-lg border border-border/60">
+        <div className="rounded-md border border-border/60">
           <Table>
             <TableHeader>
               <TableRow>
@@ -341,7 +391,9 @@ export function InventoryBatchInput({
                         size="sm"
                         className="h-7 w-full border-transparent bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
                       >
-                        <SelectValue placeholder="Kategori" />
+                        <SelectValue>
+                          {categories.find((category) => String(category.id) === row.categoryId)?.name ?? "Kategori"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
@@ -382,6 +434,7 @@ export function InventoryBatchInput({
               {existingRows.map((row) => {
                 const canEdit = isWithin2Days(row.created_at);
                 const qty = row.type === "ADJUST" ? row.signed_qty_pcs : row.qty_pcs;
+                const isDeleting = deletingMovementId === row.movement_id;
                 return (
                   <TableRow key={row.movement_id}>
                     <TableCell className="whitespace-nowrap text-sm">
@@ -396,14 +449,37 @@ export function InventoryBatchInput({
                       {row.description ?? "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Link
-                        href={`/movements/${row.movement_id}/edit`}
-                        className={buttonVariants({ variant: "outline", size: "sm" }) + (!canEdit ? " pointer-events-none opacity-50" : "")}
-                        aria-disabled={!canEdit}
-                        tabIndex={!canEdit ? -1 : 0}
-                      >
-                        Edit
-                      </Link>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingRow(row)}
+                          disabled={!canEdit || isDeleting || isSubmitting}
+                        >
+                          Edit
+                        </Button>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            className={buttonVariants({ variant: "outline", size: "icon-sm" })}
+                            aria-label="Aksi lainnya"
+                            disabled={!canEdit || isDeleting || isSubmitting}
+                          >
+                            <MoreHorizontal />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={isDeleting || isSubmitting}
+                              onClick={() => setDeleteTarget(row)}
+                            >
+                              <Trash2 />
+                              {isDeleting ? "Menghapus..." : "Hapus"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -411,6 +487,69 @@ export function InventoryBatchInput({
             </TableBody>
           </Table>
         </div>
+
+        <Dialog
+          open={Boolean(deleteTarget)}
+          onOpenChange={(open) => {
+            if (!open && deletingMovementId === null) {
+              setDeleteTarget(null);
+            }
+          }}
+        >
+          <DialogContent showCloseButton={deletingMovementId === null} className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Hapus transaksi?</DialogTitle>
+              <DialogDescription>
+                {deleteTarget
+                  ? `Transaksi ${deleteTarget.type} ${deleteTarget.qty_pcs} pcs untuk ${product.name} pada ${formatInTimeZone(new Date(deleteTarget.movement_at), WIB_TZ, "dd MMM yyyy, HH:mm")} akan dihapus. Stok akan disesuaikan kembali.`
+                  : ""}
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deletingMovementId !== null}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={confirmDeleteMovement}
+                disabled={deletingMovementId !== null}
+              >
+                {deletingMovementId !== null ? "Menghapus..." : "Ya, hapus"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(editingRow)} onOpenChange={(open) => (!open ? setEditingRow(null) : null)}>
+          <DialogContent
+            showCloseButton
+            className="top-0 right-0 left-auto h-dvh w-full max-w-120 translate-x-0 translate-y-0 rounded-none border-l border-border/60 p-0 gap-0 overflow-hidden sm:max-w-120"
+          >
+            <div className="flex h-full min-h-0 flex-col">
+              <DialogHeader className="border-b border-border/60 px-6 py-5">
+                <DialogTitle>Edit Transaksi</DialogTitle>
+              </DialogHeader>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                {editingRow ? (
+                  <MovementEditForm
+                    movement={editingRow}
+                    categories={categories}
+                    variant="drawer"
+                    onSubmittedAction={() => setEditingRow(null)}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

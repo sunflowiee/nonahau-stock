@@ -13,7 +13,7 @@ Sistem web minimalis untuk pencatatan stok dimsum (barang jadi) di Dimsum Nonaha
   - Grafik IN vs OUT (harian/bulanan/tahunan), default 7 hari terakhir
   - Filter per produk
   - Tabel stok saat ini
-- Riwayat transaksi + edit metadata (max 2 hari sejak dicatat)
+- Riwayat transaksi + edit transaksi (max 2 hari sejak dicatat)
 - Export CSV (default: IN/OUT)
 
 ## Setup

@@ -124,9 +124,29 @@ Ulangi call per produk (paling gampang) atau batch (lebih advanced).
 
 ---
 
-## 5) Edit metadata transaksi (window 2 hari)
+## 5) Edit transaksi (window 2 hari)
 
+### 5.1 IN/OUT
 ```/dev/null/nextjs_rpc_examples.ts#L287-340
+const { data, error } = await supabase.rpc('update_stock_movement', {
+  p_id: 123,
+  p_movement_at: new Date().toISOString(),
+  p_type: 'OUT',
+  p_qty_pcs: 300,
+  p_category_id: 2,
+  p_description: 'Revisi kategori dan deskripsi (masih dalam 2 hari)',
+});
+
+if (error) {
+  // contoh: "Edit ditolak: sudah lewat batas 2 hari..."
+  throw new Error(error.message);
+}
+
+return data;
+```
+
+### 5.2 ADJUST / metadata-only
+```/dev/null/nextjs_rpc_examples.ts#L342-380
 const { data, error } = await supabase.rpc('update_stock_movement_metadata', {
   p_id: 123,
   p_movement_at: new Date().toISOString(),
@@ -144,16 +164,36 @@ return data;
 
 ---
 
-## 6) Dashboard data
+## 6) Hapus transaksi (window 2 hari)
 
-### 6.1 Current stocks table
+```/dev/null/nextjs_rpc_examples.ts#L342-360
+const { data, error } = await supabase.rpc('delete_stock_movement', {
+  p_id: 123,
+});
+
+if (error) {
+  // contoh:
+  // - "Hapus ditolak: sudah lewat batas 2 hari..."
+  // - "Hapus ditolak: stok tidak cukup untuk membatalkan transaksi ini..."
+  // - "Hapus ditolak: transaksi ini masih dipakai sebagai acuan koreksi"
+  throw new Error(error.message);
+}
+
+return data;
+```
+
+---
+
+## 7) Dashboard data
+
+### 7.1 Current stocks table
 ```/dev/null/nextjs_rpc_examples.ts#L342-370
 const { data, error } = await supabase.rpc('get_current_stocks');
 if (error) throw new Error(error.message);
 return data; // [{ product_id, product_name, qty_pcs }, ...]
 ```
 
-### 6.2 Chart series (IN vs OUT)
+### 7.2 Chart series (IN vs OUT)
 ```/dev/null/nextjs_rpc_examples.ts#L372-430
 const { data, error } = await supabase.rpc('get_in_out_series', {
   p_from: '2026-05-01T00:00:00+07:00',
@@ -170,7 +210,7 @@ return data; // [{ bucket_start, in_qty, out_qty }, ...]
 
 ---
 
-## 7) Export CSV
+## 8) Export CSV
 
 Saran: export di server (Route Handler) dengan query ke view `v_stock_movements_export`, lalu ubah jadi CSV.
 

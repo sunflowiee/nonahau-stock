@@ -3,8 +3,10 @@
 import { useMemo } from "react";
 
 import { InventoryBatchInput } from "@/app/(app)/movements/_components/inventory-batch-input";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 type Product = {
   id: number;
@@ -41,11 +43,13 @@ export function InventoryTabs({
   categories,
   rows,
   stocks,
+  exportHref,
 }: {
   products: Product[];
   categories: Category[];
   rows: MovementRow[];
   stocks: StockRow[];
+  exportHref: string;
 }) {
   const rowsByProduct = useMemo(() => {
     const map = new Map<number, MovementRow[]>();
@@ -70,19 +74,36 @@ export function InventoryTabs({
   }, [stocks]);
 
   return (
-    <Tabs defaultValue={String(products[0]?.id)} className="min-w-0 gap-4">
-      <div className="overflow-x-auto pb-1">
-        <TabsList className="h-auto min-w-max gap-1 rounded-xl bg-muted/60 p-1">
-          {products.map((product) => (
-            <TabsTrigger
-              key={product.id}
-              value={String(product.id)}
-              className="h-10 min-w-35 rounded-lg px-4"
-            >
-              {product.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <Tabs defaultValue={String(products[0]?.id)} className="min-w-0 gap-0">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 bg-background/95 px-6 pt-6 supports-backdrop-filter:backdrop-blur-sm">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/40 pb-4">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Inventory</h1>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <a href={exportHref} className={cn(buttonVariants({ className: "h-9" }))}>
+              Export CSV
+            </a>
+          </div>
+        </header>
+
+        <div className="overflow-x-auto overflow-y-hidden border-b border-border/40">
+          <TabsList
+            variant="line"
+            className="min-w-max gap-5 rounded-none bg-transparent p-0 group-data-horizontal/tabs:h-auto"
+          >
+            {products.map((product) => (
+              <TabsTrigger
+                key={product.id}
+                value={String(product.id)}
+                className="h-auto flex-none rounded-none border-x-0 border-t-0 border-b-[3px] border-b-transparent bg-transparent px-0 py-3 text-sm font-medium leading-none text-muted-foreground shadow-none after:hidden hover:text-foreground data-active:border-b-foreground/30 data-active:bg-transparent data-active:text-foreground data-active:shadow-none dark:data-active:border-b-foreground/20"
+              >
+                {product.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
       </div>
 
       {products.map((product) => {
@@ -96,8 +117,8 @@ export function InventoryTabs({
           .reduce((sum, row) => sum + Number(row.qty_pcs ?? 0), 0);
 
         return (
-          <TabsContent key={product.id} value={String(product.id)} className="min-w-0 space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
+          <TabsContent key={product.id} value={String(product.id)} className="min-w-0 space-y-4 pt-5">
+            <div className="grid gap-4 md:grid-cols-3">
               <Card className="gap-2 py-0 shadow-none">
                 <CardContent className="px-4 py-4">
                   <div className="text-xs text-muted-foreground">Produk</div>

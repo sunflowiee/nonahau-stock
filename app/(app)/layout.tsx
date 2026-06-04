@@ -15,5 +15,18 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  return <AppShell userEmail={data.user.email ?? ""}>{children}</AppShell>;
+  const userName =
+    typeof data.user.user_metadata?.full_name === "string"
+      ? data.user.user_metadata.full_name
+      : typeof data.user.user_metadata?.name === "string"
+        ? data.user.user_metadata.name
+        : typeof data.user.user_metadata?.user_name === "string"
+          ? data.user.user_metadata.user_name
+          : null;
+
+  return (
+    <AppShell userEmail={data.user.email ?? ""} userName={userName}>
+      {children}
+    </AppShell>
+  );
 }

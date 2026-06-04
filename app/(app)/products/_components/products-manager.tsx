@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -83,7 +85,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: Product[
               />
             </div>
             {error ? (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                 {error}
               </div>
             ) : null}
@@ -98,12 +100,12 @@ export function ProductsManager({ initialProducts }: { initialProducts: Product[
 
       <CardContent>
         {error ? (
-          <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <div className="mb-4 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
         ) : null}
 
-        <div className="rounded-lg border border-border/60">
+        <div className="rounded-md border border-border/60">
           <Table>
             <TableHeader>
               <TableRow>
@@ -139,13 +141,22 @@ export function ProductsManager({ initialProducts }: { initialProducts: Product[
                         </DialogContent>
                       </Dialog>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateProduct(p.id, { is_active: !p.is_active })}
-                      >
-                        {p.is_active ? "Nonaktifkan" : "Aktifkan"}
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className={buttonVariants({ variant: "outline", size: "icon-sm" })}
+                          aria-label="Aksi lainnya"
+                        >
+                          <MoreHorizontal />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            variant={p.is_active ? "destructive" : "default"}
+                            onClick={() => updateProduct(p.id, { is_active: !p.is_active })}
+                          >
+                            {p.is_active ? "Nonaktifkan" : "Aktifkan"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>

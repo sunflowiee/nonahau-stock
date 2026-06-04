@@ -1,9 +1,7 @@
 import { InventoryTabs } from "@/app/(app)/movements/_components/inventory-tabs";
 import { LinkButton } from "@/components/app/link-button";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { cn } from "@/lib/utils";
 
 export default async function InventoryPage() {
   const supabase = await createSupabaseServerClient();
@@ -34,38 +32,29 @@ export default async function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Inventory</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Pantau tracking stok per produk dalam tampilan tab yang rapi, ringkas, dan mudah dibaca.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={`/api/export/movements?${exportParams.toString()}`}
-            className={cn(buttonVariants({ className: "h-9" }))}
-          >
-            Export CSV
-          </a>
-        </div>
-      </header>
-
       {activeProducts.length === 0 ? (
-        <Card className="shadow-none">
-          <CardContent className="flex min-h-60 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
-            <div className="text-base font-medium tracking-tight">produk tidak ada</div>
-            <p className="max-w-md text-sm text-muted-foreground">
-              Tambahkan produk terlebih dahulu agar data inventory dan tracking bisa ditampilkan di halaman ini.
-            </p>
-            <LinkButton href="/products" variant="outline" className="mt-2 h-9">
-              Kelola Produk
-            </LinkButton>
-          </CardContent>
-        </Card>
+        <>
+          <div className="sticky top-0 z-20 -mx-6 -mt-6 bg-background/95 px-6 pt-6 supports-backdrop-filter:backdrop-blur-sm">
+            <header className="border-b border-border/40 pb-4">
+              <h1 className="text-xl font-semibold tracking-tight">Inventory</h1>
+            </header>
+          </div>
+
+          <Card className="shadow-none">
+            <CardContent className="flex min-h-60 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+              <div className="text-base font-medium tracking-tight">produk tidak ada</div>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Tambahkan produk terlebih dahulu agar data inventory dan tracking bisa ditampilkan di halaman ini.
+              </p>
+              <LinkButton href="/products" variant="outline" className="mt-2 h-9">
+                Kelola Produk
+              </LinkButton>
+            </CardContent>
+          </Card>
+        </>
       ) : (
         <InventoryTabs
+          exportHref={`/api/export/movements?${exportParams.toString()}`}
           products={activeProducts}
           categories={(categories ?? []) as Array<{ id: number; name: string }>}
           stocks={(stocks ?? []) as Array<{ product_id: number; qty_pcs: number; product_name?: string }>}

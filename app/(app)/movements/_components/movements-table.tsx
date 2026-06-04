@@ -45,7 +45,7 @@ export function MovementsTable({
   showProductColumn?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-border/60">
+    <div className="rounded-md border border-border/60">
       <Table>
         <TableHeader>
           <TableRow>

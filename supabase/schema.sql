@@ -216,24 +216,33 @@ create trigger trg_stock_movements_category_snapshot
 before insert or update on public.stock_movements
 for each row execute function public.tg_stock_movements_category_snapshot();
 
--- 7.3) Protect immutable fields for IN/OUT: product_id, type, qty_pcs
--- Koreksi angka dilakukan melalui ADJUST.
+-- 7.3) Keep product immutable. IN/OUT may be edited only within RPC-controlled flow.
+-- ADJUST remains immutable for qty/type/product.
 create or replace function public.tg_stock_movements_immutable_in_out()
 returns trigger
 language plpgsql
 as $$
 begin
   if old.type in ('IN', 'OUT') then
+    if new.product_id <> old.product_id then
+      raise exception 'product_id transaksi tidak boleh diubah';
+    end if;
+
+    if new.type not in ('IN', 'OUT') then
+      raise exception 'type transaksi hanya boleh diubah antar IN/OUT';
+    end if;
+  elsif old.type = 'ADJUST' then
     if new.type <> old.type then
-      raise exception 'type IN/OUT tidak boleh diubah';
+      raise exception 'type ADJUST tidak boleh diubah';
     end if;
     if new.product_id <> old.product_id then
-      raise exception 'product_id IN/OUT tidak boleh diubah';
+      raise exception 'product_id ADJUST tidak boleh diubah';
     end if;
     if new.qty_pcs <> old.qty_pcs then
-      raise exception 'qty_pcs IN/OUT tidak boleh diubah; gunakan ADJUST';
+      raise exception 'qty_pcs ADJUST tidak boleh diubah';
     end if;
   end if;
+
   return new;
 end;
 $$;
@@ -425,8 +434,105 @@ begin
 end;
 $$;
 
--- 8.4) Update movement metadata only (movement_at, category_id, description)
--- Applies to all types, but blocked after 2 days from created_at.
+-- 8.4) Update IN/OUT movement entry (movement_at, type, qty_pcs, category_id, description)
+-- Product stays unchanged. Blocked after 2 days from created_at.
+create or replace function public.update_stock_movement(
+  p_id bigint,
+  p_movement_at timestamptz,
+  p_type public.movement_type,
+  p_qty_pcs bigint,
+  p_category_id bigint,
+  p_description text
+) returns public.stock_movements
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_old public.stock_movements;
+  v_new public.stock_movements;
+  v_before jsonb;
+  v_after jsonb;
+  v_stock bigint;
+  v_old_delta bigint;
+  v_new_delta bigint;
+  v_final_stock bigint;
+begin
+  select * into v_old
+  from public.stock_movements
+  where id = p_id;
+
+  if not found then
+    raise exception 'Movement tidak ditemukan';
+  end if;
+
+  if v_old.type not in ('IN', 'OUT') then
+    raise exception 'Hanya transaksi IN/OUT yang bisa diubah lewat fitur ini';
+  end if;
+
+  if p_type not in ('IN', 'OUT') then
+    raise exception 'Jenis transaksi harus IN atau OUT';
+  end if;
+
+  if p_qty_pcs is null or p_qty_pcs <= 0 then
+    raise exception 'Qty (pcs) wajib > 0';
+  end if;
+
+  if p_category_id is null then
+    raise exception 'Kategori wajib diisi';
+  end if;
+
+  if now() > (v_old.created_at + interval '2 days') then
+    raise exception 'Edit ditolak: sudah lewat batas 2 hari sejak transaksi dicatat';
+  end if;
+
+  insert into public.product_stocks(product_id, qty_pcs)
+  values (v_old.product_id, 0)
+  on conflict (product_id) do nothing;
+
+  select qty_pcs into v_stock
+  from public.product_stocks
+  where product_id = v_old.product_id
+  for update;
+
+  v_old_delta := public.signed_delta(v_old.type, v_old.qty_pcs, v_old.adjust_sign);
+  v_new_delta := public.signed_delta(p_type, p_qty_pcs, null);
+  v_final_stock := v_stock - v_old_delta + v_new_delta;
+
+  if v_final_stock < 0 then
+    raise exception 'Perubahan ditolak: stok tidak cukup. Stok akhir akan menjadi minus';
+  end if;
+
+  v_before := to_jsonb(v_old);
+
+  update public.stock_movements
+  set
+    movement_at = coalesce(p_movement_at, v_old.movement_at),
+    type = p_type,
+    qty_pcs = p_qty_pcs,
+    category_id = p_category_id,
+    description = p_description,
+    updated_by = auth.uid(),
+    updated_at = now()
+  where id = p_id
+  returning * into v_new;
+
+  update public.product_stocks
+  set qty_pcs = v_final_stock,
+      updated_at = now()
+  where product_id = v_old.product_id;
+
+  v_after := to_jsonb(v_new);
+
+  insert into public.stock_movement_audits(movement_id, changed_by, before_json, after_json)
+  values (p_id, auth.uid(), v_before, v_after);
+
+  return v_new;
+end;
+$$;
+
+-- 8.5) Update movement metadata only (movement_at, category_id, description)
+-- Kept for legacy ADJUST edits and blocked after 2 days from created_at.
 create or replace function public.update_stock_movement_metadata(
   p_id bigint,
   p_movement_at timestamptz,
@@ -481,7 +587,68 @@ begin
 end;
 $$;
 
--- 8.5) Dashboard series: IN vs OUT grouped by day/month/year (WIB buckets)
+-- 8.6) Delete movement entry and reverse its stock impact.
+-- Blocked after 2 days from created_at.
+create or replace function public.delete_stock_movement(
+  p_id bigint
+) returns public.stock_movements
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_old public.stock_movements;
+  v_stock bigint;
+  v_delta bigint;
+  v_final_stock bigint;
+begin
+  select * into v_old
+  from public.stock_movements
+  where id = p_id
+  for update;
+
+  if not found then
+    raise exception 'Movement tidak ditemukan';
+  end if;
+
+  if now() > (v_old.created_at + interval '2 days') then
+    raise exception 'Hapus ditolak: sudah lewat batas 2 hari sejak transaksi dicatat';
+  end if;
+
+  insert into public.product_stocks(product_id, qty_pcs)
+  values (v_old.product_id, 0)
+  on conflict (product_id) do nothing;
+
+  select qty_pcs into v_stock
+  from public.product_stocks
+  where product_id = v_old.product_id
+  for update;
+
+  v_delta := public.signed_delta(v_old.type, v_old.qty_pcs, v_old.adjust_sign);
+  v_final_stock := v_stock - v_delta;
+
+  if v_final_stock < 0 then
+    raise exception 'Hapus ditolak: stok tidak cukup untuk membatalkan transaksi ini. Stok akhir akan menjadi minus';
+  end if;
+
+  begin
+    delete from public.stock_movements
+    where id = p_id;
+  exception
+    when foreign_key_violation then
+      raise exception 'Hapus ditolak: transaksi ini masih dipakai sebagai acuan koreksi';
+  end;
+
+  update public.product_stocks
+  set qty_pcs = v_final_stock,
+      updated_at = now()
+  where product_id = v_old.product_id;
+
+  return v_old;
+end;
+$$;
+
+-- 8.7) Dashboard series: IN vs OUT grouped by day/month/year (WIB buckets)
 create or replace function public.get_in_out_series(
   p_from timestamptz,
   p_to timestamptz,
@@ -610,13 +777,17 @@ join public.products p on p.id = m.product_id;
 -- Restrict execute privileges to authenticated (and optionally service_role).
 revoke all on function public.create_category_if_not_exists(text) from public;
 revoke all on function public.create_stock_movement(timestamptz, bigint, public.movement_type, bigint, smallint, public.adjust_kind, bigint, bigint, text) from public;
+revoke all on function public.update_stock_movement(bigint, timestamptz, public.movement_type, bigint, bigint, text) from public;
 revoke all on function public.update_stock_movement_metadata(bigint, timestamptz, bigint, text) from public;
+revoke all on function public.delete_stock_movement(bigint) from public;
 revoke all on function public.get_in_out_series(timestamptz, timestamptz, bigint, text) from public;
 revoke all on function public.get_current_stocks() from public;
 
 grant execute on function public.create_category_if_not_exists(text) to authenticated;
 grant execute on function public.create_stock_movement(timestamptz, bigint, public.movement_type, bigint, smallint, public.adjust_kind, bigint, bigint, text) to authenticated;
+grant execute on function public.update_stock_movement(bigint, timestamptz, public.movement_type, bigint, bigint, text) to authenticated;
 grant execute on function public.update_stock_movement_metadata(bigint, timestamptz, bigint, text) to authenticated;
+grant execute on function public.delete_stock_movement(bigint) to authenticated;
 grant execute on function public.get_in_out_series(timestamptz, timestamptz, bigint, text) to authenticated;
 grant execute on function public.get_current_stocks() to authenticated;
 
@@ -637,7 +808,7 @@ grant select on table public.v_stock_movements_export to authenticated;
 -- Strategy:
 -- - Allow authenticated SELECT on all.
 -- - Allow authenticated INSERT only (optional); for stricter control, you can revoke insert/update and use only RPC.
--- - Disallow direct UPDATE/DELETE; metadata updates should go via RPC `update_stock_movement_metadata`.
+-- - Disallow direct UPDATE/DELETE; business updates/deletes should go via RPC.
 
 alter table public.products enable row level security;
 alter table public.categories enable row level security;

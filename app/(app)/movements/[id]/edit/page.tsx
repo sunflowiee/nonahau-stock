@@ -54,17 +54,14 @@ export default async function MovementEditPage({
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Edit Metadata</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Kamu hanya bisa mengubah tanggal/jam, kategori, dan deskripsi. Qty/type/produk tidak bisa diubah.
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight">Edit Transaksi</h1>
         </div>
         <LinkButton href="/movements" variant="outline" className="h-9">
           Kembali
         </LinkButton>
       </header>
 
-      <MovementEditForm movement={row} categories={categories ?? []} />
+      <MovementEditForm movement={row} categories={(categories ?? []) as Array<{ id: number; name: string }>} />
     </div>
   );
 }

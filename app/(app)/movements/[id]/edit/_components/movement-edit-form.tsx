@@ -2,10 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatInTimeZone } from "date-fns-tz";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { WIB_TZ } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,8 +17,6 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-type Category = { id: number; name: string };
-
 type Movement = {
   movement_id: number;
   movement_at: string;
@@ -30,7 +26,13 @@ type Movement = {
   qty_pcs: number;
   signed_qty_pcs: number;
   category_id: number;
+  category_name: string;
   description: string | null;
+};
+
+type Category = {
+  id: number;
+  name: string;
 };
 
 function toLocalInputValue(iso: string) {
@@ -47,14 +49,29 @@ function fromLocalInputValue(localValue: string) {
 export function MovementEditForm({
   movement,
   categories,
+  variant = "page",
+  onSubmittedAction,
 }: {
   movement: Movement;
   categories: Category[];
+  variant?: "page" | "drawer";
+  onSubmittedAction?: () => void;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
+  const categoryOptions = [
+    ...categories,
+    ...(!categories.some((category) => category.id === movement.category_id)
+      ? [{ id: movement.category_id, name: movement.category_name }]
+      : []),
+  ];
+
   const [movementAt, setMovementAt] = useState(() => toLocalInputValue(movement.movement_at));
+  const [movementType, setMovementType] = useState<"IN" | "OUT">(
+    movement.type === "OUT" ? "OUT" : "IN"
+  );
+  const [qtyPcs, setQtyPcs] = useState(String(movement.qty_pcs));
   const [categoryId, setCategoryId] = useState(String(movement.category_id));
   const [description, setDescription] = useState(movement.description ?? "");
 
@@ -62,17 +79,44 @@ export function MovementEditForm({
   const [error, setError] = useState<string | null>(null);
 
   const qty = movement.type === "ADJUST" ? movement.signed_qty_pcs : movement.qty_pcs;
+  const isAdjust = movement.type === "ADJUST";
 
   async function save() {
     setIsSubmitting(true);
     setError(null);
 
-    const { error: rpcError } = await supabase.rpc("update_stock_movement_metadata", {
-      p_id: movement.movement_id,
-      p_movement_at: fromLocalInputValue(movementAt),
-      p_category_id: Number(categoryId),
-      p_description: description || null,
-    });
+    const qtyValue = Number(qtyPcs);
+    const categoryIdValue = Number(categoryId);
+
+    if (!categoryId || !categoryIdValue) {
+      setError("Kategori wajib dipilih.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!isAdjust) {
+      if (!qtyValue || qtyValue <= 0) {
+        setError("Qty (pcs) wajib > 0.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    const { error: rpcError } = isAdjust
+      ? await supabase.rpc("update_stock_movement_metadata", {
+          p_id: movement.movement_id,
+          p_movement_at: fromLocalInputValue(movementAt),
+          p_category_id: categoryIdValue,
+          p_description: description || null,
+        })
+      : await supabase.rpc("update_stock_movement", {
+          p_id: movement.movement_id,
+          p_movement_at: fromLocalInputValue(movementAt),
+          p_type: movementType,
+          p_qty_pcs: qtyValue,
+          p_category_id: categoryIdValue,
+          p_description: description || null,
+        });
 
     if (rpcError) {
       setError(rpcError.message);
@@ -80,82 +124,92 @@ export function MovementEditForm({
       return;
     }
 
-    router.replace("/movements");
+    if (variant === "page") {
+      router.replace("/movements");
+    }
     router.refresh();
+    onSubmittedAction?.();
   }
 
-  return (
-    <Card className="shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium">Detail</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
-          Edit hanya boleh dalam 2 hari sejak transaksi dicatat. Jika lewat, sistem akan menolak saat disimpan.
+  const content = (
+    <>
+      <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-600 px-3 py-2 text-sm">
+        Edit hanya bisa dilakukan dalam 2 hari sejak transaksi dicatat.
+      </div>
+
+      {error ? (
+        <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {error}
         </div>
+      ) : null}
 
-        {error ? (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Produk</Label>
-            <Input value={movement.product_name} readOnly className="h-9" />
-          </div>
-          <div className="space-y-2">
-            <Label>Tipe</Label>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Produk</Label>
+          <Input value={movement.product_name} readOnly className="h-9" />
+        </div>
+        <div className="space-y-2">
+          <Label>Jenis Transaksi</Label>
+          {isAdjust ? (
             <Input value={movement.type} readOnly className="h-9" />
-          </div>
-          <div className="space-y-2">
-            <Label>Qty (pcs)</Label>
-            <Input value={String(qty)} readOnly className="h-9 text-right tabular-nums" />
-          </div>
-          <div className="space-y-2">
-            <Label>Dibuat</Label>
-            <Input
-              value={formatInTimeZone(new Date(movement.created_at), WIB_TZ, "dd MMM yyyy, HH:mm")}
-              readOnly
-              className="h-9"
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="movementAt">Tanggal/Jam Transaksi</Label>
-            <Input
-              id="movementAt"
-              type="datetime-local"
-              value={movementAt}
-              onChange={(e) => setMovementAt(e.target.value)}
-              className="h-9"
-              disabled={isSubmitting}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Kategori</Label>
+          ) : (
             <Select
-              value={categoryId}
-              onValueChange={(v) => setCategoryId(v ?? "")}
+              value={movementType}
+              onValueChange={(value) => setMovementType(value === "OUT" ? "OUT" : "IN")}
               disabled={isSubmitting}
             >
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Kategori" />
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue>{movementType}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="IN">IN</SelectItem>
+                <SelectItem value="OUT">OUT</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          )}
         </div>
-
+        <div className="space-y-2">
+          <Label>Qty (pcs)</Label>
+          <Input
+            value={isAdjust ? String(qty) : qtyPcs}
+            onChange={(e) => setQtyPcs(e.target.value)}
+            readOnly={isAdjust}
+            className="h-9 text-right tabular-nums"
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="movementAt">Tanggal/Jam Transaksi</Label>
+          <Input
+            id="movementAt"
+            type="datetime-local"
+            value={movementAt}
+            onChange={(e) => setMovementAt(e.target.value)}
+            className="h-9"
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Kategori</Label>
+          <Select
+            value={categoryId}
+            onValueChange={(value) => setCategoryId(value ?? "")}
+            disabled={isSubmitting}
+          >
+            <SelectTrigger className="h-9 w-full">
+              <SelectValue>
+                {categoryOptions.find((category) => String(category.id) === categoryId)?.name ?? "Pilih kategori"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {categoryOptions.map((category) => (
+                <SelectItem key={category.id} value={String(category.id)}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="desc">Deskripsi</Label>
           <Textarea
@@ -166,13 +220,26 @@ export function MovementEditForm({
             disabled={isSubmitting}
           />
         </div>
+      </div>
 
-        <div className="flex justify-end">
-          <Button onClick={save} disabled={isSubmitting}>
-            {isSubmitting ? "Menyimpan..." : "Simpan"}
-          </Button>
-        </div>
-      </CardContent>
+      <div className="flex justify-end">
+        <Button onClick={save} disabled={isSubmitting}>
+          {isSubmitting ? "Menyimpan..." : "Simpan"}
+        </Button>
+      </div>
+    </>
+  );
+
+  if (variant === "drawer") {
+    return <div className="space-y-5">{content}</div>;
+  }
+
+  return (
+    <Card className="shadow-none">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium">Detail</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">{content}</CardContent>
     </Card>
   );
 }

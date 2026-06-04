@@ -127,9 +127,37 @@ Contoh opname positif 100 pcs:
 
 ---
 
-## 3) Update metadata (edit window 2 hari)
+## 3) Update transaction (edit window 2 hari)
 
-### Function
+### 3.1 Function — IN/OUT
+`update_stock_movement(
+  p_id bigint,
+  p_movement_at timestamptz,
+  p_type movement_type,
+  p_qty_pcs bigint,
+  p_category_id bigint,
+  p_description text
+) -> stock_movements`
+
+### Rules — IN/OUT
+- Hanya boleh update sebelum 2 hari sejak transaksi dicatat: `now() <= created_at + 2 days`
+- `product_id` tetap immutable
+- `type`, `qty_pcs`, `category`, `movement_at`, dan `description` boleh diubah sesuai validasi stok
+- `category_id` wajib
+
+### Example payload — IN/OUT
+```/dev/null/rpc_payloads.json#L85-98
+{
+  "p_id": 123,
+  "p_movement_at": "2026-05-20T16:00:00+07:00",
+  "p_type": "OUT",
+  "p_qty_pcs": 300,
+  "p_category_id": 11,
+  "p_description": "Update catatan: pengiriman sore"
+}
+```
+
+### 3.2 Function — ADJUST / metadata-only
 `update_stock_movement_metadata(
   p_id bigint,
   p_movement_at timestamptz,
@@ -137,23 +165,43 @@ Contoh opname positif 100 pcs:
   p_description text
 ) -> stock_movements`
 
-### Rules
+### Rules — ADJUST
 - Hanya boleh update sebelum 2 hari sejak transaksi dicatat: `now() <= created_at + 2 days`
-- Untuk `IN/OUT`, trigger juga memastikan `qty/type/product` tidak berubah.
+- Untuk `ADJUST`, `qty/type/product` tetap tidak bisa diubah
 
-### Example payload
-```/dev/null/rpc_payloads.json#L85-96
+### Example payload — ADJUST
+```/dev/null/rpc_payloads.json#L100-111
 {
   "p_id": 123,
   "p_movement_at": "2026-05-20T16:00:00+07:00",
   "p_category_id": 11,
-  "p_description": "Update catatan: pengiriman sore"
+  "p_description": "Update catatan: koreksi sore"
 }
 ```
 
 ---
 
-## 4) Data untuk dashboard (grafik IN vs OUT)
+## 4) Delete transaction (window 2 hari)
+
+### Function
+`delete_stock_movement(p_id bigint) -> stock_movements`
+
+### Rules
+- Hanya boleh hapus sebelum 2 hari sejak transaksi dicatat: `now() <= created_at + 2 days`
+- Stok akan dikembalikan dengan membalik delta transaksi yang dihapus
+- Hapus ditolak jika stok akhir akan menjadi minus
+- Hapus ditolak jika transaksi masih dipakai sebagai acuan koreksi
+
+### Example payload
+```/dev/null/rpc_payloads.json#L98-101
+{
+  "p_id": 123
+}
+```
+
+---
+
+## 5) Data untuk dashboard (grafik IN vs OUT)
 
 ### RPC: current stock table
 `get_current_stocks() -> table(product_id bigint, product_name text, qty_pcs bigint)`
@@ -175,7 +223,7 @@ Karena Supabase client tidak ideal untuk SQL `date_trunc` + timezone grouping, d
 
 ---
 
-## 5) Export CSV
+## 6) Export CSV
 
 ### Data source
 - View `v_stock_movements_export` (recommended) sudah join `product_name` + qty signed.
@@ -198,9 +246,12 @@ Kolom CSV minimum:
 
 ---
 
-## 6) Error messages (UX)
+## 7) Error messages (UX)
 Aplikasi sebaiknya menangkap error dari RPC dan menampilkan pesan yang jelas:
 - `Stok tidak cukup...`
 - `Edit ditolak: sudah lewat batas 2 hari...`
 - `Koreksi ditolak: sudah lewat batas 2 hari...`
+- `Hapus ditolak: sudah lewat batas 2 hari...`
+- `Hapus ditolak: stok tidak cukup untuk membatalkan transaksi ini...`
+- `Hapus ditolak: transaksi ini masih dipakai sebagai acuan koreksi`
 - `Kategori wajib diisi`

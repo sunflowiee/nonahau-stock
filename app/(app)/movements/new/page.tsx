@@ -39,7 +39,7 @@ export default async function NewMovementPage({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Tambah Transaksi</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Catat stok masuk dan stok keluar. Qty, tipe, dan produk tidak bisa diubah lewat halaman edit.
+            Catat stok masuk dan stok keluar. Produk tetap, tapi qty, tipe, kategori, tanggal, dan deskripsi masih bisa diubah selama 2 hari.
           </p>
         </div>
         <LinkButton href="/movements" variant="outline" className="h-9">
